@@ -20,6 +20,11 @@ generator = FinancialReportGenerator()
 
 # 侧边栏配置
 with st.sidebar:
+    # 添加精美Logo
+    st.image(
+        "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20financial%20logo%20with%20golden%20color%2C%20institution-level%20design%2C%20clean%20and%20modern&image_size=square",
+        width=150
+    )
     st.title("配置中心")
     
     # 授权校验模块
@@ -101,31 +106,31 @@ if authorized:
                     st.stop()
             
             # 显示分析进度
-            with st.status("正在进行深度分析...", expanded=True) as status:
+            with st.status("正在调取智库核心数据库...", expanded=True) as status:
                 
                 try:
                     # 1. 抓取数据
-                    st.write("🔄 正在抓取财务数据...")
+                    st.write("🔄 正在同步市场核心数据...")
                     time.sleep(0.5)  # 模拟网络延迟
                     
                     # 获取财务数据
                     financial_data = generator.spider.get_company_financial_data(stock_code)
                     
-                    st.write("📊 正在处理财务数据...")
+                    st.write("📊 正在进行多维财务建模...")
                     time.sleep(0.5)
                     
                     # 处理财务数据
                     processed_data = generator.processor.process_financial_data_for_multicolumn(financial_data)
                     
                     # 2. 显示核心指标
-                    st.write("✨ 正在生成分析结果...")
+                    st.write("✨ 正在生成智能分析洞察...")
                     time.sleep(0.5)
                     
                     # 提取公司信息
                     company_info = processed_data.get('company_info', {})
                     
                     # 3. 生成Excel文件（内存流）
-                    st.write("📈 正在生成Excel报告...")
+                    st.write("📈 正在构建专业报告矩阵...")
                     time.sleep(0.5)
                     
                     # 创建ExcelHandler实例
@@ -254,6 +259,12 @@ if authorized:
                         st.exception(e)
 else:
     st.error("智库专家系统：请联系管理员获取授权")
+
+# 免责声明
+st.markdown("---")
+st.info(
+    "**风险提示：** 本系统数据来源于公开市场信息，分析逻辑基于历史财务表现，不构成任何投资建议。投资有风险，入市需谨慎。"
+)
 
 # 系统信息
 st.markdown("---")
