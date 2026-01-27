@@ -18,13 +18,18 @@ st.set_page_config(
 # 创建FinancialReportGenerator实例
 generator = FinancialReportGenerator()
 
+# 在页面顶部居中显示2D品牌Logo
+col1, col2, col3 = st.columns([1, 1, 1])
+with col2:
+    st.image(
+        "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20financial%202D%20logo%20with%20golden%20color%2C%20institution-level%20design%2C%20clean%20and%20modern&image_size=square",
+        use_container_width=True
+    )
+    # 添加专业的留白间距
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
 # 侧边栏配置
 with st.sidebar:
-    # 添加精美Logo
-    st.image(
-        "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=professional%20financial%20logo%20with%20golden%20color%2C%20institution-level%20design%2C%20clean%20and%20modern&image_size=square",
-        width=150
-    )
     st.title("配置中心")
     
     # 授权校验模块
