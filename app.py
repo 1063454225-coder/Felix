@@ -18,15 +18,11 @@ st.set_page_config(
 # 创建FinancialReportGenerator实例
 generator = FinancialReportGenerator()
 
-# 在页面顶部居中显示2D品牌Logo
-col1, col2, col3 = st.columns([1, 2, 1])
+# 在页面顶部居中显示Logo
+col1, col2, col3 = st.columns([1, 1, 1])
 with col2:
-    st.image(
-        "Felix_logo.png",
-        use_container_width=True
-    )
-    # 添加专业的留白间距
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+    st.image("Felix_logo.png", width=200)
+    st.markdown("<br>", unsafe_allow_html=True)
 
 # 侧边栏配置
 with st.sidebar:
