@@ -56,10 +56,35 @@ class FinancialDataSpider:
             headers = {}
         headers['User-Agent'] = self.get_random_user_agent()
         
+        # 获取当前服务器公网IP
+        try:
+            ip_response = self.session.get('https://ifconfig.me/ip', timeout=5)
+            public_ip = ip_response.text.strip()
+            logger.info(f"当前服务器公网IP: {public_ip}")
+        except Exception as ip_error:
+            logger.warning(f"获取公网IP失败: {ip_error}")
+        
         for i in range(retry):
             try:
                 response = self.session.get(url, headers=headers, params=params, timeout=timeout)
-                response.raise_for_status()
+                
+                # 诊断逻辑：检查返回内容
+                content = response.text
+                status_code = response.status_code
+                
+                # 检查是否有访问限制
+                if '访问限制' in content or 'Forbidden' in content:
+                    logger.error(f"请求 {url} 被限制访问，状态码: {status_code}")
+                    logger.error(f"返回内容前200字符: {content[:200]}")
+                
+                # 尝试检查状态码
+                try:
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as http_error:
+                    logger.error(f"HTTP错误，状态码: {status_code}")
+                    logger.error(f"返回内容前200字符: {content[:200]}")
+                    raise
+                
                 return response
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Request failed (attempt {i+1}/{retry}): {e}")
