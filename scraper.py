@@ -509,9 +509,21 @@ class FinancialDataSpider:
             market_code = '0'
             stock_num = stock_code[2:]
         else:
-            raise ValueError("股票代码格式错误，应为 SHXXX 或 SZXXX")
+            # 智能判断市场
+            if len(stock_code) == 6:
+                if stock_code.startswith(('00', '30', '002')):
+                    market_code = '0'  # 深圳
+                    stock_num = stock_code
+                elif stock_code.startswith(('60', '68')):
+                    market_code = '1'  # 上海
+                    stock_num = stock_code
+                else:
+                    raise ValueError("股票代码格式错误，应为 SHXXX 或 SZXXX")
+            else:
+                raise ValueError("股票代码格式错误，应为 SHXXX 或 SZXXX")
         
         secid = f"{market_code}.{stock_num}"
+        logger.info(f"构建secid: {secid} (市场代码: {market_code}, 股票代码: {stock_num})")
         
         # 构建URL
         url = f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f43,f44,f45,f60,f62,f169,f170,f116"

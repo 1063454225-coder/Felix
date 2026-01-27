@@ -86,8 +86,16 @@ if authorized:
             # 规范化股票代码
             if not stock_code.startswith(('SH', 'SZ')):
                 if len(stock_code) == 6:
-                    # 默认为上海股票
-                    stock_code = f"SH{stock_code}"
+                    # 智能市场识别
+                    if stock_code.startswith(('00', '30', '002')):
+                        # 深市股票
+                        stock_code = f"SZ{stock_code}"
+                    elif stock_code.startswith(('60', '68')):
+                        # 沪市股票
+                        stock_code = f"SH{stock_code}"
+                    else:
+                        st.error("请输入有效的6位股票代码")
+                        st.stop()
                 else:
                     st.error("请输入有效的6位股票代码")
                     st.stop()

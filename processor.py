@@ -665,23 +665,38 @@ class DataProcessor:
                                 # 存储小数形式，让Excel的百分比格式处理显示
                                 extended_metrics[year]['net_profit_cash_ratio'] = round(cash_ratio, 4)
             
-            # 计算资产负债率（负债合计/资产合计）
-            if 'balance_sheet' in financial_data:
+            # 计算资产负债率（负债合计/资产合计）和ROE（净资产收益率）
+            if 'balance_sheet' in financial_data and 'income_statement' in financial_data:
                 balance_data = financial_data['balance_sheet']
+                income_data = financial_data['income_statement']
                 
                 if isinstance(balance_data, pd.DataFrame):
                     logger.info(f"资产负债表字段名: {list(balance_data.columns)}")
                     logger.info(f"资产负债表数据类型: {type(balance_data)}")
                     logger.info(f"资产负债表是否为空: {balance_data.empty}")
                 
-                if isinstance(balance_data, pd.DataFrame) and 'YEAR' in balance_data.columns:
+                if isinstance(balance_data, pd.DataFrame) and 'YEAR' in balance_data.columns and isinstance(income_data, pd.DataFrame) and 'YEAR' in income_data.columns:
+                    # 构建年份到股东权益的映射
+                    equity_map = {}
                     for year in Constants.YEAR_RANGE:
                         year_data = balance_data[balance_data['YEAR'] == year]
-                        logger.info(f"2020年资产负债表数据: {not year_data.empty}")
+                        if not year_data.empty:
+                            row = year_data.iloc[0]
+                            total_equity = row.get('TOTAL_EQUITY', 0)
+                            equity_map[year] = total_equity
+                            logger.info(f"{year}年股东权益: {total_equity}")
+                    
+                    # 计算ROE和资产负债率
+                    for year in Constants.YEAR_RANGE:
+                        year_data = balance_data[balance_data['YEAR'] == year]
+                        income_year_data = income_data[income_data['YEAR'] == year]
+                        logger.info(f"{year}年资产负债表数据: {not year_data.empty}, 利润表数据: {not income_year_data.empty}")
+                        
                         if not year_data.empty:
                             row = year_data.iloc[0]
                             logger.info(f"资产负债表行数据: {row.to_dict()}")
                             
+                            # 计算资产负债率
                             total_liabilities = row.get('TOTAL_LIABILITIES', 0)
                             total_assets = row.get('TOTAL_ASSETS', 0)
                             logger.info(f"负债合计: {total_liabilities}, 资产合计: {total_assets}")
@@ -693,6 +708,33 @@ class DataProcessor:
                                     debt_ratio, 
                                     FieldMapping.INDICATOR_MAP.get('debt_asset_ratio', {'decimal_places': 2})
                                 )
+                        
+                        # 计算ROE
+                        if not year_data.empty and not income_year_data.empty:
+                            balance_row = year_data.iloc[0]
+                            income_row = income_year_data.iloc[0]
+                            
+                            # 获取当前年份的净利润
+                            net_profit = income_row.get('PARENT_NETPROFIT', 0)
+                            logger.info(f"{year}年净利润: {net_profit}")
+                            
+                            # 获取当前年份和上一年份的股东权益
+                            current_equity = equity_map.get(year, 0)
+                            previous_equity = equity_map.get(year - 1, 0)
+                            
+                            # 计算平均股东权益
+                            if current_equity > 0 or previous_equity > 0:
+                                avg_equity = (current_equity + previous_equity) / 2
+                                logger.info(f"{year}年平均股东权益: {avg_equity}")
+                                
+                                # 计算ROE
+                                if avg_equity > 0:
+                                    roe = (net_profit / avg_equity) * 100
+                                    logger.info(f"{year}年ROE: {roe}")
+                                    extended_metrics[year]['roe'] = self.clean_value(
+                                        roe, 
+                                        FieldMapping.INDICATOR_MAP.get('roe', {'decimal_places': 2})
+                                    )
             
             # 计算分红率（分配股利、利润或偿付利息支付的现金/净利润）
             if 'cash_flow_statement' in financial_data and 'income_statement' in financial_data:
@@ -756,16 +798,20 @@ class DataProcessor:
                                 if total_shares <= 0:
                                     total_shares = 0.0
                                     logger.warning("未获取到总股本数据，使用默认值: 0.0股")
-                                if total_shares > 0:
+                                    ocfps = 'N/A'
+                                else:
                                     # 假设净利润含金量为100%
                                     operating_cash_flow = net_profit
                                     ocfps = operating_cash_flow / total_shares
                                     logger.info(f"基于净利润估算每股经营现金流: {ocfps}")
                             
-                            extended_metrics[year]['ocfps'] = self.clean_value(
-                                ocfps, 
-                                FieldMapping.INDICATOR_MAP.get('ocfps', {'decimal_places': 2})
-                            )
+                            if ocfps != 'N/A':
+                                extended_metrics[year]['ocfps'] = self.clean_value(
+                                    ocfps, 
+                                    FieldMapping.INDICATOR_MAP.get('ocfps', {'decimal_places': 2})
+                                )
+                            else:
+                                extended_metrics[year]['ocfps'] = ocfps
                             
                             # 每股净资产
                             bps = income_row.get('BPS', 0)  # 每股净资产
@@ -824,15 +870,19 @@ class DataProcessor:
                             if total_shares <= 0:
                                 total_shares = 0.0
                                 logger.warning("未获取到总股本数据，使用默认值: 0.0股")
+                                # 当总股本为0时，相关指标显示为N/A
+                                extended_metrics[year]['bps'] = 'N/A'
+                                extended_metrics[year]['ocfps'] = 'N/A'
+                                extended_metrics[year]['eps'] = 'N/A'
+                                continue
                             
                             # 每股净资产
                             total_equity = balance_row.get('TOTAL_EQUITY', 0)
-                            if total_shares > 0:
-                                bps = total_equity / total_shares
-                                extended_metrics[year]['bps'] = self.clean_value(
-                                    bps, 
-                                    FieldMapping.INDICATOR_MAP.get('bps', {'decimal_places': 2})
-                                )
+                            bps = total_equity / total_shares
+                            extended_metrics[year]['bps'] = self.clean_value(
+                                bps, 
+                                FieldMapping.INDICATOR_MAP.get('bps', {'decimal_places': 2})
+                            )
             
             # 计算股息率（每股分红 / 当前股价 * 100%）
             if 'income_statement' in financial_data and 'valuation_data' in financial_data:
