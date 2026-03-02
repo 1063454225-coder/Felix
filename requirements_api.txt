@@ -1,0 +1,19 @@
+# FastAPI 后端依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# 现有项目依赖
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+openpyxl>=3.1.0
+pandas>=2.1.0
+numpy>=1.24.0
+akshare>=1.12.0
+
+# AI 相关依赖（可选）
+dashscope>=1.14.0
+
+# 日志和工具
+python-dotenv>=1.0.0

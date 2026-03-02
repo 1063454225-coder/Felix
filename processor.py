@@ -1150,3 +1150,181 @@ if __name__ == "__main__":
     # 测试除零处理
     zero_growth = processor.calculate_growth_rate(1500, 0)
     print(f"除零处理测试 - 结果: {zero_growth}")
+
+
+class InvestmentCalculator:
+    """
+    投资收益复利计算器
+    
+    计算逻辑（与Excel模板完全一致）：
+    - 初始买入：2019年12月31日收盘价买入100股
+    - 每年计算：
+      - 分红可买入股数 = 前一年总股数 × 每股现金红利 ÷ 除权日收盘价
+      - 送转股数 = 前一年总股数 × 每股送和转股数
+      - 总股数 = 前一年总股数 + 分红可买入股数 + 送转股数
+      - 市值 = 总股数 × 除权日收盘价
+      - 投资收益率 = (市值 - 期初投资市值) ÷ 期初投资市值
+    """
+    
+    def __init__(self):
+        self.initial_shares = 100  # 初始持股数
+        self.initial_year = 2019  # 初始年份
+    
+    def calculate_investment_return(self, dividend_data, initial_price, current_price, roe_data=None):
+        """
+        计算投资收益复利
+        
+        Args:
+            dividend_data: 分红数据列表，每个元素包含：
+                {
+                    'year': 年份,
+                    'ex_dividend_date': 除权除息日,
+                    'cash_dividend_per_share': 每股现金红利,
+                    'bonus_shares_per_share': 每股送转股数,
+                    'ex_date_price': 除权日股价
+                }
+            initial_price: 初始买入价格（2019年底收盘价）
+            current_price: 当前市场价
+            roe_data: ROE数据字典 {年份: ROE值}
+            
+        Returns:
+            计算结果字典，包含：
+            {
+                'years': 年份列表,
+                'ex_dates': 除权日期列表,
+                'dividends': 每股分红列表,
+                'bonus_shares': 送转股数列表,
+                'ex_prices': 除权日股价列表,
+                'reinvest_shares': 分红再买入股数列表,
+                'cumulative_shares': 累计持股数列表,
+                'holdings_value': 持仓价值列表,
+                'cumulative_return': 累计收益率列表,
+                'roe_values': ROE值列表
+            }
+        """
+        try:
+            logger.info(f"[Investment Calculator] 开始计算投资收益...")
+            logger.info(f"[Investment Calculator] 初始价格: {initial_price}, 当前价格: {current_price}")
+            
+            # 初始化结果字典
+            result = {
+                'years': [],
+                'ex_dates': [],
+                'dividends': [],
+                'bonus_shares': [],
+                'ex_prices': [],
+                'reinvest_shares': [],
+                'cumulative_shares': [],
+                'holdings_value': [],
+                'cumulative_return': [],
+                'roe_values': []
+            }
+            
+            # 初始持股数
+            cumulative_shares = self.initial_shares
+            
+            # 初始投入成本
+            if initial_price > 0:
+                initial_cost = self.initial_shares * initial_price
+                logger.info(f"[Investment Calculator] 初始持股: {cumulative_shares}, 初始成本: {initial_cost}")
+            else:
+                # 如果没有初始价格，从第一次分红开始计算
+                initial_cost = 0
+                logger.info(f"[Investment Calculator] 未获取到初始价格，将从第一次分红开始计算")
+            
+            # 按年份排序分红数据
+            sorted_dividends = sorted(dividend_data, key=lambda x: x['year'])
+            
+            # 如果没有初始价格，从第一次分红开始计算
+            if initial_price <= 0 and sorted_dividends:
+                first_dividend = sorted_dividends[0]
+                initial_price = first_dividend['ex_date_price']
+                initial_cost = self.initial_shares * initial_price
+                logger.info(f"[Investment Calculator] 使用第一次分红作为初始价格: {initial_price}, 初始成本: {initial_cost}")
+            
+            # 计算每年的数据
+            for i, dividend_info in enumerate(sorted_dividends):
+                year = dividend_info['year']
+                ex_date = dividend_info['ex_dividend_date']
+                cash_dividend = dividend_info['cash_dividend_per_share']
+                bonus_shares = dividend_info['bonus_shares_per_share']
+                ex_price = dividend_info['ex_date_price']
+                
+                # 使用除权日所在的年份作为显示年份
+                display_year = ex_date.year if ex_date else year
+                
+                logger.info(f"[Investment Calculator] {display_year}年: 除权日={ex_date}, 分红={cash_dividend}, 送转={bonus_shares}, 除权价={ex_price}")
+                
+                # 计算分红再买入股数（Row 16）
+                # 公式: (上一年度累计持股数 * 当年每股现金红利) / 当年除权日收盘价
+                reinvest_shares = 0
+                if cumulative_shares > 0 and cash_dividend > 0 and ex_price > 0:
+                    reinvest_shares = (cumulative_shares * cash_dividend) / ex_price
+                    reinvest_shares = round(reinvest_shares, 4)  # 保留4位小数
+                    logger.info(f"[Investment Calculator] 分红再买入股数: {reinvest_shares}")
+                
+                # 计算送转增加股数（Row 17）
+                # 公式: 上一年度累计持股数 * 当年每股送转股数
+                bonus_increase_shares = 0
+                if cumulative_shares > 0 and bonus_shares > 0:
+                    bonus_increase_shares = cumulative_shares * bonus_shares
+                    bonus_increase_shares = round(bonus_increase_shares, 4)  # 保留4位小数
+                    logger.info(f"[Investment Calculator] 送转增加股数: {bonus_increase_shares}")
+                
+                # 计算本年度累计持股数（Row 18）
+                # 公式: 上一年度累计持股数 + 当年分红再买入股数 + 当年送转增加股数
+                cumulative_shares = cumulative_shares + reinvest_shares + bonus_increase_shares
+                cumulative_shares = round(cumulative_shares, 4)  # 保留4位小数
+                logger.info(f"[Investment Calculator] 本年度累计持股数: {cumulative_shares}")
+                
+                # 获取ROE值（使用分红年度）
+                roe_value = roe_data.get(year, None) if roe_data else None
+                
+                # 添加到结果（使用除权日年份）
+                result['years'].append(display_year)
+                result['ex_dates'].append(ex_date if ex_date else '')
+                result['dividends'].append(round(cash_dividend, 2) if cash_dividend > 0 else 0)
+                result['bonus_shares'].append(round(bonus_shares, 4) if bonus_shares > 0 else 0)
+                result['ex_prices'].append(round(ex_price, 2) if ex_price > 0 else 0)
+                result['reinvest_shares'].append(reinvest_shares)
+                result['cumulative_shares'].append(cumulative_shares)
+                result['roe_values'].append(roe_value if roe_value else '')
+            
+            # 计算持仓价值和累计收益率
+            for i, year in enumerate(result['years']):
+                shares = result['cumulative_shares'][i]
+                
+                # 持仓价值 = 当前持股数 * 当前市场价
+                holdings_value = shares * current_price
+                result['holdings_value'].append(round(holdings_value, 2))
+                
+                # 累计收益率 = (持仓价值 - 初始投入成本) / 初始投入成本
+                if initial_cost > 0:
+                    cumulative_return = (holdings_value - initial_cost) / initial_cost
+                    cumulative_return = round(cumulative_return, 4)
+                else:
+                    cumulative_return = 0
+                
+                result['cumulative_return'].append(cumulative_return)
+            
+            logger.info(f"[Investment Calculator] 计算完成")
+            logger.info(f"[Investment Calculator] 最终持股数: {result['cumulative_shares'][-1] if result['cumulative_shares'] else 0}")
+            logger.info(f"[Investment Calculator] 最终持仓价值: {result['holdings_value'][-1] if result['holdings_value'] else 0}")
+            logger.info(f"[Investment Calculator] 最终累计收益率: {result['cumulative_return'][-1] if result['cumulative_return'] else 0}")
+            
+            return result
+            
+        except Exception as e:
+            logger.exception(f"[Investment Calculator] 计算失败: {e}")
+            return {
+                'years': [],
+                'ex_dates': [],
+                'dividends': [],
+                'bonus_shares': [],
+                'ex_prices': [],
+                'reinvest_shares': [],
+                'cumulative_shares': [],
+                'holdings_value': [],
+                'cumulative_return': [],
+                'roe_values': []
+            }

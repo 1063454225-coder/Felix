@@ -7,7 +7,7 @@ import argparse
 import logging
 import os
 from scraper import FinancialDataSpider
-from processor import DataProcessor
+from processor import DataProcessor, InvestmentCalculator
 from excel_handler import ExcelHandler
 from config import Constants, LogConfig
 
@@ -23,6 +23,7 @@ class FinancialReportGenerator:
     def __init__(self):
         self.spider = FinancialDataSpider()
         self.processor = DataProcessor()
+        self.investment_calculator = InvestmentCalculator()
         self.excel_handler = None
         
     def generate_report(self, stock_code, output_file):
@@ -60,6 +61,18 @@ class FinancialReportGenerator:
                 logger.error("写入数据失败")
                 return False
             
+            # 3.5 计算并写入投资收益数据
+            logger.info("正在计算投资收益...")
+            investment_data = self._calculate_investment_return(stock_code, processed_data)
+            
+            # 即使没有初始价格，只要有分红数据就写入投资收益区域
+            if investment_data and investment_data.get('years'):
+                logger.info("正在写入投资收益区域...")
+                self.excel_handler.setup_investment_return_structure()
+                self.excel_handler.write_investment_return_data(investment_data)
+            else:
+                logger.warning("没有投资收益数据可写入")
+            
             # 4. 保存Excel文件
             logger.info(f"正在保存Excel文件...")
             if not self.excel_handler.save_file(output_file):
@@ -74,27 +87,6 @@ class FinancialReportGenerator:
             
         except Exception as e:
             logger.error(f"财务报告生成失败: {e}")
-            # 尝试使用模拟数据
-            try:
-                logger.info("使用模拟数据重新生成报告...")
-                
-                # 生成模拟数据
-                mock_data = self.mock_generator.generate_mock_data(stock_code)
-                
-                # 处理模拟数据（多列格式）
-                processed_data = self.processor.process_financial_data_for_multicolumn(mock_data)
-                
-                # 创建Excel文件（多列格式）
-                self.excel_handler = ExcelHandler()
-                if self.excel_handler.create_new_workbook():
-                    self.excel_handler.write_multicolumn_data(processed_data, stock_code)
-                    self.excel_handler.save_file(output_file)
-                    self.excel_handler.close()
-                    logger.info(f"使用模拟数据生成报告成功: {output_file}")
-                    return True
-            except Exception as mock_error:
-                logger.error(f"使用模拟数据生成报告也失败了: {mock_error}")
-            
             return False
     
     def _validate_multicolumn_data(self, processed_data, stock_code):
@@ -191,6 +183,74 @@ class FinancialReportGenerator:
         print("\n" + "="*80)
         print("数据验证完成")
         print("="*80 + "\n")
+    
+    def _calculate_investment_return(self, stock_code, processed_data):
+        """
+        计算投资收益复利
+        
+        Args:
+            stock_code: 股票代码
+            processed_data: 处理后的财务数据
+            
+        Returns:
+            投资收益计算结果字典
+        """
+        try:
+            logger.info(f"[Investment] 开始计算投资收益: {stock_code}")
+            
+            # 1. 获取分红数据
+            dividend_data = self.spider.get_dividend_data(stock_code, years=[2020, 2021, 2022, 2023, 2024, 2025])
+            
+            if not dividend_data:
+                logger.warning(f"[Investment] 未获取到分红数据")
+                return None
+            
+            logger.info(f"[Investment] 获取到 {len(dividend_data)} 年分红数据")
+            
+            # 2. 获取初始价格（2019年底）
+            initial_price = self.spider.get_initial_price(stock_code)
+            
+            if initial_price <= 0:
+                logger.warning(f"[Investment] 未获取到初始价格，将使用第一次分红价格作为初始价格")
+                # 不返回None，让InvestmentCalculator处理这种情况
+            
+            logger.info(f"[Investment] 初始价格: {initial_price}")
+            
+            # 3. 获取当前价格
+            valuation_data = self.spider.get_eastmoney_valuation(stock_code)
+            current_price = valuation_data.get('current_price', 0)
+            
+            if current_price <= 0:
+                logger.warning(f"[Investment] 未获取到当前价格")
+                return None
+            
+            logger.info(f"[Investment] 当前价格: {current_price}")
+            
+            # 4. 获取ROE数据
+            roe_data = {}
+            for year in [2020, 2021, 2022, 2023, 2024]:
+                if year in processed_data and 'roe' in processed_data[year]:
+                    roe_data[year] = processed_data[year]['roe']
+            
+            logger.info(f"[Investment] ROE数据: {roe_data}")
+            
+            # 5. 计算投资收益
+            investment_result = self.investment_calculator.calculate_investment_return(
+                dividend_data=dividend_data,
+                initial_price=initial_price,
+                current_price=current_price,
+                roe_data=roe_data
+            )
+            
+            logger.info(f"[Investment] 投资收益计算完成")
+            logger.info(f"[Investment] 最终持股数: {investment_result['cumulative_shares'][-1] if investment_result['cumulative_shares'] else 0}")
+            logger.info(f"[Investment] 最终累计收益率: {investment_result['cumulative_return'][-1] if investment_result['cumulative_return'] else 0}")
+            
+            return investment_result
+            
+        except Exception as e:
+            logger.exception(f"[Investment] 计算投资收益失败: {e}")
+            return None
 
 def main():
     """

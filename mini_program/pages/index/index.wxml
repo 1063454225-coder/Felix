@@ -1,0 +1,95 @@
+<!--pages/index/index.wxml-->
+<view class="container">
+  <!-- Logo 区域 -->
+  <view class="logo-section">
+    <image class="logo" src="/images/logo.png" mode="aspectFit"></image>
+    <text class="title">智库·全自动企业价值评估系统</text>
+  </view>
+
+  <!-- 输入表单 -->
+  <view class="form-section">
+    <view class="form-item">
+      <text class="label">股票代码</text>
+      <input
+        class="input"
+        type="number"
+        maxlength="6"
+        placeholder="请输入6位股票代码"
+        value="{{stockCode}}"
+        bindinput="onStockCodeInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <text class="label">授权码（可选）</text>
+      <input
+        class="input"
+        type="text"
+        password="{{true}}"
+        placeholder="请输入授权码"
+        value="{{authCode}}"
+        bindinput="onAuthCodeInput"
+      />
+    </view>
+
+    <button
+      class="btn-analyze {{loading ? 'btn-disabled' : ''}}"
+      bindtap="analyzeStock"
+      disabled="{{loading}}"
+    >
+      {{loading ? '分析中...' : '开始分析'}}
+    </button>
+  </view>
+
+  <!-- 错误提示 -->
+  <view wx:if="{{error}}" class="error-section">
+    <view class="error-card">
+      <text class="error-icon">⚠️</text>
+      <text class="error-message">{{error}}</text>
+    </view>
+  </view>
+
+  <!-- 分析结果 -->
+  <view wx:if="{{showResult && result}}" class="result-section">
+    <view class="result-card">
+      <view class="result-header">
+        <text class="result-title">分析结果</text>
+        <text class="result-status success">✓ 成功</text>
+      </view>
+
+      <view class="result-info">
+        <view class="info-row">
+          <text class="info-label">股票代码</text>
+          <text class="info-value">{{result.stock_code}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">公司名称</text>
+          <text class="info-value">{{result.company_name}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">生成时间</text>
+          <text class="info-value">{{result.generated_time}}</text>
+        </view>
+      </view>
+
+      <view class="result-actions">
+        <button class="btn-download" bindtap="downloadExcel">
+          📥 下载 Excel 报告
+        </button>
+        <button class="btn-reset" bindtap="resetForm">
+          🔄 重新分析
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 帮助按钮 -->
+  <view class="help-section">
+    <text class="help-link" bindtap="showHelp">❓ 使用说明</text>
+  </view>
+
+  <!-- 底部信息 -->
+  <view class="footer">
+    <text class="footer-text">© 2024 智库·全自动企业价值评估系统</text>
+  </view>
+</view>

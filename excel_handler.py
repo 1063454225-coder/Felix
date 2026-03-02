@@ -626,6 +626,123 @@ class ExcelHandler:
                 logger.info("Excel文件已关闭")
         except Exception as e:
             logger.error(f"关闭Excel文件失败: {e}")
+    
+    def setup_investment_return_structure(self):
+        """
+        设置投资收益区域结构
+        """
+        try:
+            if not self.ws:
+                logger.error("工作表未初始化")
+                return False
+            
+            # 找到最后一行
+            last_row = self.ws.max_row
+            
+            # 添加投资收益区域标题
+            title_row = last_row + 2
+            self.ws.merge_cells(f'A{title_row}:H{title_row}')
+            self.ws[f'A{title_row}'] = '投资收益复利分析'
+            self.ws[f'A{title_row}'].font = Font(size=14, bold=True)
+            self.ws[f'A{title_row}'].alignment = Alignment(horizontal='center', vertical='center')
+            
+            # 设置表头
+            header_row = title_row + 1
+            headers = ['年份', '除权日期', '每股分红(元)', '送转股(股)', '除权日股价(元)', '累计持股(股)', '持仓市值(元)', '累计收益率(%)']
+            for col_idx, header in enumerate(headers, start=1):
+                cell = self.ws.cell(row=header_row, column=col_idx, value=header)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.fill = PatternFill(start_color='D3D3D3', end_color='D3D3D3', fill_type='solid')
+            
+            # 设置列宽
+            column_widths = [12, 15, 15, 12, 15, 12, 15, 15]
+            for col_idx, width in enumerate(column_widths, start=1):
+                self.ws.column_dimensions[chr(64 + col_idx)].width = width
+            
+            logger.info("投资收益区域结构设置完成")
+            return True
+            
+        except Exception as e:
+            logger.error(f"设置投资收益区域结构失败: {e}")
+            return False
+    
+    def write_investment_return_data(self, investment_data):
+        """
+        写入投资收益数据
+        :param investment_data: 投资收益数据字典
+        """
+        try:
+            if not self.ws:
+                logger.error("工作表未初始化")
+                return False
+            
+            if not investment_data or not investment_data.get('years'):
+                logger.warning("没有投资收益数据可写入")
+                return False
+            
+            # 找到表头行
+            last_row = self.ws.max_row
+            header_row = last_row
+            
+            # 从表头行开始写入数据
+            data_row = header_row + 1
+            
+            years = investment_data.get('years', [])
+            ex_dates = investment_data.get('ex_dates', [])
+            dividends = investment_data.get('dividends', [])
+            bonus_shares = investment_data.get('bonus_shares', [])
+            ex_prices = investment_data.get('ex_prices', [])
+            cumulative_shares = investment_data.get('cumulative_shares', [])
+            holdings_value = investment_data.get('holdings_value', [])
+            cumulative_return = investment_data.get('cumulative_return', [])
+            
+            for i in range(len(years)):
+                row = data_row + i
+                
+                # 年份
+                self.ws.cell(row=row, column=1, value=years[i])
+                
+                # 除权日期
+                if i < len(ex_dates) and ex_dates[i]:
+                    self.ws.cell(row=row, column=2, value=ex_dates[i].strftime('%Y-%m-%d'))
+                
+                # 每股分红
+                if i < len(dividends):
+                    self.ws.cell(row=row, column=3, value=dividends[i])
+                    self.ws.cell(row=row, column=3).number_format = '0.00'
+                
+                # 送转股
+                if i < len(bonus_shares):
+                    self.ws.cell(row=row, column=4, value=bonus_shares[i])
+                    self.ws.cell(row=row, column=4).number_format = '0.00'
+                
+                # 除权日股价
+                if i < len(ex_prices):
+                    self.ws.cell(row=row, column=5, value=ex_prices[i])
+                    self.ws.cell(row=row, column=5).number_format = '0.00'
+                
+                # 累计持股
+                if i < len(cumulative_shares):
+                    self.ws.cell(row=row, column=6, value=cumulative_shares[i])
+                    self.ws.cell(row=row, column=6).number_format = '0.00'
+                
+                # 持仓市值
+                if i < len(holdings_value):
+                    self.ws.cell(row=row, column=7, value=holdings_value[i])
+                    self.ws.cell(row=row, column=7).number_format = '0.00'
+                
+                # 累计收益率
+                if i < len(cumulative_return):
+                    self.ws.cell(row=row, column=8, value=cumulative_return[i])
+                    self.ws.cell(row=row, column=8).number_format = '0.00%'
+            
+            logger.info(f"投资收益数据写入完成，共 {len(years)} 年数据")
+            return True
+            
+        except Exception as e:
+            logger.error(f"写入投资收益数据失败: {e}")
+            return False
 
 if __name__ == "__main__":
     # 测试Excel处理功能

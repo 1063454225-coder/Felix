@@ -979,6 +979,119 @@ class FinancialDataSpider:
                     forecast_row['OPERATING_CASH_FLOW'] = last_cash_flow * (1 + avg_cash_flow_growth) if pd.notna(avg_cash_flow_growth) and avg_cash_flow_growth > -0.5 else last_cash_flow * 1.1
         
         return forecast_row
+    
+    def get_dividend_data(self, stock_code, years=None):
+        """
+        获取分红数据
+        
+        Args:
+            stock_code: 股票代码，如 SH600519
+            years: 年份列表，如 [2020, 2021, 2022, 2023, 2024]
+            
+        Returns:
+            分红数据列表，每个元素包含：
+            {
+                'year': 年份,
+                'ex_dividend_date': 除权除息日,
+                'cash_dividend_per_share': 每股现金红利,
+                'bonus_shares_per_share': 每股送转股数,
+                'ex_date_price': 除权日股价
+            }
+        """
+        if years is None:
+            years = [2020, 2021, 2022, 2023, 2024, 2025]
+        
+        # 提取股票代码数字部分（去掉SH/SZ前缀）
+        stock_num = stock_code[2:] if stock_code.startswith('SH') or stock_code.startswith('SZ') else stock_code
+        
+        logger.info(f"正在获取分红数据: {stock_code}")
+        
+        try:
+            import akshare as ak
+            
+            # 使用AKShare获取分红数据
+            dividend_df = ak.stock_history_dividend_detail(symbol=stock_num)
+            
+            if dividend_df.empty:
+                logger.warning(f"分红数据为空")
+                return []
+            
+            logger.info(f"成功获取 {len(dividend_df)} 条分红记录")
+            
+            dividend_data = []
+            for _, row in dividend_df.iterrows():
+                try:
+                    ex_dividend_date_str = row.get('除权除息日', '')
+                    if pd.isna(ex_dividend_date_str) or ex_dividend_date_str == '':
+                        continue
+                    
+                    from datetime import datetime
+                    if isinstance(ex_dividend_date_str, str):
+                        ex_dividend_date = datetime.strptime(ex_dividend_date_str, '%Y-%m-%d')
+                    else:
+                        ex_dividend_date = ex_dividend_date_str
+                    
+                    year = ex_dividend_date.year
+                    
+                    if year not in years:
+                        continue
+                    
+                    cash_dividend = float(row.get('派息', 0)) / 10  # 每10股分红转每股
+                    bonus_shares = float(row.get('送股', 0)) / 10 + float(row.get('转增', 0)) / 10  # 每10股送转转每股
+                    
+                    dividend_data.append({
+                        'year': year,
+                        'ex_dividend_date': ex_dividend_date,
+                        'cash_dividend_per_share': cash_dividend,
+                        'bonus_shares_per_share': bonus_shares,
+                        'ex_date_price': 0.0  # 需要单独获取除权日股价
+                    })
+                    
+                except Exception as e:
+                    logger.warning(f"解析分红记录失败: {e}")
+                    continue
+            
+            logger.info(f"成功获取 {len(dividend_data)} 年分红数据")
+            return dividend_data
+            
+        except Exception as e:
+            logger.error(f"获取分红数据失败: {e}")
+            return []
+    
+    def get_initial_price(self, stock_code):
+        """
+        获取初始价格（2019年底收盘价）
+        
+        Args:
+            stock_code: 股票代码，如 SH600519
+            
+        Returns:
+            2019年底收盘价
+        """
+        # 提取股票代码数字部分（去掉SH/SZ前缀）
+        stock_num = stock_code[2:] if stock_code.startswith('SH') or stock_code.startswith('SZ') else stock_code
+        
+        logger.info(f"正在获取2019年底收盘价: {stock_code}")
+        
+        try:
+            import akshare as ak
+            
+            # 使用AKShare获取历史行情数据
+            stock_df = ak.stock_zh_a_hist(symbol=stock_num, period="daily", start_date="20190101", end_date="20191231", adjust="qfq")
+            
+            if stock_df.empty:
+                logger.warning(f"未找到2019年历史行情数据")
+                return 0.0
+            
+            # 获取2019年最后一个交易日的收盘价
+            last_record = stock_df.iloc[-1]
+            close_price = float(last_record['收盘'])
+            logger.info(f"成功获取2019年底收盘价: {close_price}")
+            return close_price
+            
+        except Exception as e:
+            logger.error(f"获取初始价格失败: {e}")
+            return 0.0
 
 if __name__ == "__main__":
     # 测试爬虫
